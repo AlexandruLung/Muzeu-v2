@@ -16,8 +16,12 @@
 #include <fstream>
 #include <sstream>
 
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <vector>
+#include "OBJ_Loader.h"
+objl::Loader Loader;
 
 #pragma comment (lib, "glfw3dll.lib")
 #pragma comment (lib, "glew32.lib")
@@ -367,7 +371,140 @@ private:
 private:
 	unsigned int ID;
 };
+class SkyBox {
+public:
 
+	SkyBox Skybox()
+	{
+		GLfloat skyboxVertices[108] =
+		{
+			// positions          
+			-10.0f,  10.0f, -10.0f,
+			-10.0f, -10.0f, -10.0f,
+			10.0f, -10.0f, -10.0f,
+			10.0f, -10.0f, -10.0f,
+			10.0f,  10.0f, -10.0f,
+			-10.0f,  10.0f, -10.0f,
+
+			-10.0f, -10.0f,  10.0f,
+			-10.0f, -10.0f, -10.0f,
+			-10.0f,  10.0f, -10.0f,
+			-10.0f,  10.0f, -10.0f,
+			-10.0f,  10.0f,  10.0f,
+			-10.0f, -10.0f,  10.0f,
+
+			10.0f, -10.0f, -10.0f,
+			10.0f, -10.0f,  10.0f,
+			10.0f,  10.0f,  10.0f,
+			10.0f,  10.0f,  10.0f,
+			10.0f,  10.0f, -10.0f,
+			10.0f, -10.0f, -10.0f,
+
+			-10.0f, -10.0f,  10.0f,
+			-10.0f,  10.0f,  10.0f,
+			10.0f,  10.0f,  10.0f,
+			10.0f,  10.0f,  10.0f,
+			10.0f, -10.0f,  10.0f,
+			-10.0f, -10.0f,  10.0f,
+
+			-10.0f,  10.0f, -10.0f,
+			10.0f,  10.0f, -10.0f,
+			10.0f,  10.0f,  10.0f,
+			10.0f,  10.0f,  10.0f,
+			-10.0f,  10.0f,  10.0f,
+			-10.0f,  10.0f, -10.0f,
+
+			-10.0f, -10.0f, -10.0f,
+			-10.0f, -10.0f,  10.0f,
+			10.0f, -10.0f, -10.0f,
+			10.0f, -10.0f, -10.0f,
+			-10.0f, -10.0f,  10.0f,
+			10.0f, -10.0f,  10.0f
+		};
+
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+		std::vector<std::string> faces
+		{
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/right.jpg",
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/left.jpg",
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/top.jpg",
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/bottom.jpg",
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/front.jpg",
+			"C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/back.jpg"
+		};
+
+		cubemapTexture = loadCubemap(faces);
+
+		shader = new Shader("skybox.vs", "skybox.fs");
+
+		shader->Use();
+		shader->SetInt("skybox", 0);
+	}
+
+
+
+
+	void Draw(const glm::mat4& view, const glm::mat4& projection)
+	{
+		glDepthFunc(GL_LEQUAL);
+		shader->Use();
+		shader->SetMat4("view", glm::mat4(glm::mat3(view)));
+		shader->SetMat4("projection", projection);
+		// skybox cube
+		glBindVertexArray(VAO);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0);
+		glDepthFunc(GL_LESS);
+	}
+
+private:
+	unsigned int cubemapTexture;
+
+	GLuint VAO;
+	GLuint VBO;
+
+	Shader* shader;
+
+	GLuint loadCubemap(std::vector<std::string> faces)
+	{
+		unsigned int textureID;
+		glGenTextures(1, &textureID);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+		int width, height, nrChannels;
+		for (unsigned int i = 0; i < faces.size(); i++)
+		{
+			unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+			if (data)
+			{
+				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+				stbi_image_free(data);
+			}
+			else
+			{
+				printf("Stb can't load this sh*t: %s\n", faces[i].c_str());
+				stbi_image_free(data);
+			}
+		}
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		return textureID;
+	}
+
+};
 Camera* pCamera = nullptr;
 
 unsigned int CreateTexture(const std::string& strTexturePath)
@@ -413,8 +550,25 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
 void renderScene(const Shader& shader);
+void renderWall(const Shader& shader);
+void renderDodo(const Shader& shader);
 
+
+//objects
+//void renderCube();
 void renderFloor();
+
+void renderTrexTop();
+void renderTrexBottom();
+
+
+void renderRoomF();
+//room
+void renderRoomF1();
+void renderRoomF2();
+void renderRoomF3();
+void renderRoomF4();
+void renderRoomF5();
 
 
 // timing
@@ -422,8 +576,79 @@ double deltaTime = 0.0f;    // time between current frame and last frame
 double lastFrame = 0.0f;
 
 bool rotateLight = false;
+SkyBox* skybox;
 
-void main(int argc, char** argv)
+GLuint VAO, VBO, EBO;
+void CreateVBO()
+{
+	float vertices[] = {
+-1, -1, 1,0, 0, 1,0.375, 0,
+1, -1, 1,0, 0, 1,0.625, 0,
+1, 1, 1,0, 0, 1,0.625, 0.25,
+-1, 1, 1,0, 0, 1,0.375, 0.25,
+-1, 1, 1,0, 1, 0,0.375, 0.25,
+1, 1, 1,0, 1, 0,0.625, 0.25,
+1, 1, -1,0, 1, 0,0.625, 0.5,
+-1, 1, -1,0, 1, 0,0.375, 0.5,
+-1, 1, -1,0, 0, -1,0.375, 0.5,
+1, 1, -1,0, 0, -1,0.625, 0.5,
+1, -1, -1,0, 0, -1,0.625, 0.75,
+-1, -1, -1,0, 0, -1,0.375, 0.75,
+-1, -1, -1,0, -1, 0,0.375, 0.75,
+1, -1, -1,0, -1, 0,0.625, 0.75,
+1, -1, 1,0, -1, 0,0.625, 1,
+-1, -1, 1,0, -1, 0,0.375, 1,
+1, -1, 1,1, 0, 0,0.625, 0,
+1, -1, -1,1, 0, 0,0.875, 0,
+1, 1, -1,1, 0, 0,0.875, 0.25,
+1, 1, 1,1, 0, 0,0.625, 0.25,
+-1, -1, -1,-1, 0, 0,0.125, 0,
+-1, -1, 1,-1, 0, 0,0.375, 0,
+-1, 1, 1,-1, 0, 0,0.375, 0.25,
+-1, 1, -1,-1, 0, 0,0.125, 0.25
+	};
+
+	unsigned int indices[] = {
+0, 1, 3,
+1, 2, 3,
+4, 5, 7,
+5, 6, 7,
+8, 9, 11,
+9, 10, 11,
+12, 13, 15,
+13, 14, 15,
+16, 17, 19,
+17, 18, 19,
+ 20, 21, 23,
+ 21, 22, 23
+	};
+
+
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	// color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	// texture coord attribute
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+}
+
+
+int main(int argc, char** argv)
 {
 	std::string strFullExeFileName = argv[0];
 	std::string strExePath;
@@ -452,7 +677,7 @@ void main(int argc, char** argv)
 	glfwSetScrollCallback(window, scroll_callback);
 
 	// tell GLFW to capture our mouse
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	glewInit();
 
@@ -465,12 +690,15 @@ void main(int argc, char** argv)
 
 	// build and compile shaders
 	// -------------------------
+
 	Shader shadowMappingShader("ShadowMapping.vs", "ShadowMapping.fs");
 	Shader shadowMappingDepthShader("ShadowMappingDepth.vs", "ShadowMappingDepth.fs");
 
 	// load textures
 	// -------------
+	unsigned int floorTexture1 = CreateTexture(strExePath + "\\triceratops.jpeg");
 	unsigned int floorTexture = CreateTexture(strExePath + "\\ColoredFloor.png");
+	unsigned int wallTexture = CreateTexture(strExePath + "\\Wall.jpg");
 
 	// configure depth map FBO
 	// -----------------------
@@ -502,7 +730,7 @@ void main(int argc, char** argv)
 	shadowMappingShader.Use();
 	shadowMappingShader.SetInt("diffuseTexture", 0);
 	shadowMappingShader.SetInt("shadowMap", 1);
-
+	
 	// lighting info
 	// -------------
 	glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
@@ -519,7 +747,7 @@ void main(int argc, char** argv)
 		float currentFrame = (float)glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-
+		glfwPollEvents();
 		// input
 		// -----
 		processInput(window);
@@ -527,8 +755,8 @@ void main(int argc, char** argv)
 		if (rotateLight)
 		{
 			lightFrame += 0.01f;
-			lightPos.x = cos(lightFrame) * 2.0f;
-			lightPos.z = sin(lightFrame) * 2.0f;
+			lightPos.x = cos(lightFrame) * 10.0f;
+			lightPos.z = sin(lightFrame) * 10.0f;
 		}
 
 		// render
@@ -540,14 +768,14 @@ void main(int argc, char** argv)
 		glm::mat4 lightProjection, lightView;
 		glm::mat4 lightSpaceMatrix;
 		float near_plane = 1.0f, far_plane = 7.5f;
-		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+		lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
 		lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 		lightSpaceMatrix = lightProjection * lightView;
 
 		// render scene from light's point of view
 		shadowMappingDepthShader.Use();
 		shadowMappingDepthShader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
-
+	
 		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -556,6 +784,29 @@ void main(int argc, char** argv)
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
 		renderScene(shadowMappingDepthShader);
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, wallTexture);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
+		renderWall(shadowMappingDepthShader);
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, floorTexture1);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
+		renderDodo(shadowMappingDepthShader);
 		glCullFace(GL_BACK);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -575,6 +826,7 @@ void main(int argc, char** argv)
 		shadowMappingShader.SetVec3("viewPos", pCamera->GetPosition());
 		shadowMappingShader.SetVec3("lightPos", lightPos);
 		shadowMappingShader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, floorTexture);
 		glActiveTexture(GL_TEXTURE1);
@@ -582,6 +834,29 @@ void main(int argc, char** argv)
 		glDisable(GL_CULL_FACE);
 		renderScene(shadowMappingShader);
 
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, wallTexture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		glDisable(GL_CULL_FACE);
+		renderWall(shadowMappingShader);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, floorTexture1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		glDisable(GL_CULL_FACE);
+		renderDodo(shadowMappingShader);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, floorTexture1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		glDisable(GL_CULL_FACE);
+		//renderPeacock(shadowMappingShader);
+	
+	
+		//skybox = new SkyBox();
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -602,6 +877,41 @@ void renderScene(const Shader& shader)
 	glm::mat4 model;
 	shader.SetMat4("model", model);
 	renderFloor();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF();
+}
+
+void renderDodo(const Shader& shader)
+{
+	//cube
+	glm::mat4 model;
+	model = glm::mat4();
+	shader.SetMat4("model", model);
+	//renderCube();
+
+	// duck
+	/*model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
+	model = glm::scale(model, glm::vec3(0.75f));
+	shader.SetMat4("model", model);
+	renderDodo();
+	*/
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
+	model = glm::scale(model, glm::vec3(0.75f));
+	shader.SetMat4("model", model);
+	renderTrexBottom();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
+	model = glm::scale(model, glm::vec3(0.75f));
+	shader.SetMat4("model", model);
+	renderTrexTop();
 }
 
 unsigned int planeVAO = 0;
@@ -613,54 +923,13 @@ void renderFloor()
 		// set up vertex data (and buffer(s)) and configure vertex attributes
 		float planeVertices[] = {
 			// positions            // normals         // texcoords
-			5.0f, -1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, -1.0f,  5.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
+		25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+			-25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+			-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
 
-			5.0f, -1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-			//back wall
-			-5.0f, -1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			5.0f, -1.0f, 5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-
-			-5.0f, -1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			-5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-			//front wall
-			5.0f, 1.0f,  -5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-
-			5.0f, 1.0f,  -5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-			//left wall
-			-5.0f, 1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, -1.0f, 5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-
-			-5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			-5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			//right wall
-			5.0f, -1.0f,  -5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-
-			5.0f, 1.0f, 5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			5.0f, -1.0f, 5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, -1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			//roof
-			5.0f, 1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, 1.0f,  5.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-			-5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-
-			5.0f, 1.0f,  5.0f,  0.0f, 1.0f, 0.0f,  5.0f,  0.0f,
-			-5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 5.0f,
-			5.0f, 1.0f, -5.0f,  0.0f, 1.0f, 0.0f,  5.0f, 5.0f,
-
+			25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
+			-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  0.0f, 25.0f,
+			25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 25.0f
 
 
 
@@ -690,8 +959,664 @@ void renderFloor()
 // -------------------------------------------------
 unsigned int cubeVAO = 0;
 unsigned int cubeVBO = 0;
+float vertices[82000];
+unsigned int indices[72000];
+GLuint floorVAO, floorVBO, floorEBO;
+void renderRoomF()
+{
+	// initialize (if necessary)
+	if (floorVAO == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
 
 
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+	
+		objl::Mesh curMesh = Loader.LoadedMeshes[0];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &floorVAO);
+		glGenBuffers(1, &floorVBO);
+		glGenBuffers(1, &floorEBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+
+GLuint trexTopVAO, trexTopVBO, trexTopEBO;
+void renderTrexTop()
+{
+	if (trexTopVAO == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/Trex.obj");
+		objl::Mesh curMesh = Loader.LoadedMeshes[1];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &trexTopVAO);
+		glGenBuffers(1, &trexTopVBO);
+		glGenBuffers(1, &trexTopEBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, trexTopVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, trexTopEBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(trexTopVAO);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(trexTopVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, trexTopVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, trexTopEBO);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+}
+
+GLuint trexBottomVAO, trexBottomVBO, trexBottomEBO;
+void renderTrexBottom()
+{
+	if (trexBottomVAO == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/Trex.obj");
+		objl::Mesh curMesh = Loader.LoadedMeshes[0];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &trexBottomVAO);
+		glGenBuffers(1, &trexBottomVBO);
+		glGenBuffers(1, &trexBottomEBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, trexBottomVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, trexBottomEBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(trexBottomVAO);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(trexBottomVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, trexBottomVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, trexBottomEBO);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+}
+
+GLuint floorVAO1, floorVBO1, floorEBO1;
+void renderRoomF1()
+{
+	// initialize (if necessary)
+	if (floorVAO1 == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+		for (int i = 0; i < Loader.LoadedMeshes.size(); i++)
+		{
+			objl::Mesh curMesh = Loader.LoadedMeshes[1];
+			int size = curMesh.Vertices.size();
+
+			for (int j = 0; j < curMesh.Vertices.size(); j++)
+			{
+
+				verticess.push_back((float)curMesh.Vertices[j].Position.X);
+				verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+				verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+				verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+				verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+			}
+			for (int j = 0; j < verticess.size(); j++)
+			{
+				vertices[j] = verticess.at(j);
+			}
+
+			for (int j = 0; j < curMesh.Indices.size(); j++)
+			{
+
+				indicess.push_back((float)curMesh.Indices[j]);
+
+			}
+			for (int j = 0; j < curMesh.Indices.size(); j++)
+			{
+				indices[j] = indicess.at(j);
+			}
+		}
+		glGenVertexArrays(1, &floorVAO1);
+		glGenBuffers(1, &floorVBO1);
+		glGenBuffers(1, &floorEBO1);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO1);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO1);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO1);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO1);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO1);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO1);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+GLuint floorVAO2, floorVBO2, floorEBO2;
+
+void renderRoomF2()
+{
+	// initialize (if necessary)
+	if (floorVAO2 == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+		for (int i = 0; i < Loader.LoadedMeshes.size(); i++)
+		{
+			objl::Mesh curMesh = Loader.LoadedMeshes[2];
+			int size = curMesh.Vertices.size();
+
+			for (int j = 0; j < curMesh.Vertices.size(); j++)
+			{
+
+				verticess.push_back((float)curMesh.Vertices[j].Position.X);
+				verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+				verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+				verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+				verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+				verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+			}
+			for (int j = 0; j < verticess.size(); j++)
+			{
+				vertices[j] = verticess.at(j);
+			}
+
+			for (int j = 0; j < curMesh.Indices.size(); j++)
+			{
+
+				indicess.push_back((float)curMesh.Indices[j]);
+
+			}
+			for (int j = 0; j < curMesh.Indices.size(); j++)
+			{
+				indices[j] = indicess.at(j);
+			}
+		}
+		glGenVertexArrays(1, &floorVAO2);
+		glGenBuffers(1, &floorVBO2);
+		glGenBuffers(1, &floorEBO2);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO2);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO2);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO2);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO2);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO2);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+GLuint floorVAO3, floorVBO3, floorEBO3;
+
+void renderRoomF3()
+{
+	// initialize (if necessary)
+	if (floorVAO3 == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+		objl::Mesh curMesh = Loader.LoadedMeshes[3];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &floorVAO3);
+		glGenBuffers(1, &floorVBO3);
+		glGenBuffers(1, &floorEBO3);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO3);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO3);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO3);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO3);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO3);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+GLuint floorVAO4, floorVBO4, floorEBO4;
+
+void renderRoomF4()
+{
+	// initialize (if necessary)
+	if (floorVAO4 == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+		objl::Mesh curMesh = Loader.LoadedMeshes[4];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &floorVAO4);
+		glGenBuffers(1, &floorVBO4);
+		glGenBuffers(1, &floorEBO4);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO4);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO4);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO4);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO4);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO4);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO4);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+GLuint floorVAO5, floorVBO5, floorEBO5;
+
+void renderRoomF5()
+{
+	// initialize (if necessary)
+	if (floorVAO5 == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Museum/Debug/room.obj");
+		objl::Mesh curMesh = Loader.LoadedMeshes[5];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &floorVAO5);
+		glGenBuffers(1, &floorVBO5);
+		glGenBuffers(1, &floorEBO5);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, floorVBO5);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO5);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(floorVAO5);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(floorVAO5);
+	glBindBuffer(GL_ARRAY_BUFFER, floorVBO5);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO5);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+
+}
+void renderWall(const Shader& shader)
+{
+	glm::mat4 model;
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF1();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF2();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF3();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF4();
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(2.f));
+	shader.SetMat4("model", model);
+	renderRoomF5();
+}
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 void processInput(GLFWwindow* window)
 {

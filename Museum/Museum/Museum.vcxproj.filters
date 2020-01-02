@@ -18,6 +18,9 @@
     <ClCompile Include="Museum.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Skybox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="ShadowMapping.fs">
@@ -32,5 +35,19 @@
     <None Include="ShadowMappingDepth.vs">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="skybox.fs">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="skybox.vs">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Skybox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OBJ_Loader.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
