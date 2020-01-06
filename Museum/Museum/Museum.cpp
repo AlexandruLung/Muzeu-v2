@@ -420,21 +420,22 @@ void renderScene(const Shader& shader);
 
 void upperDino();
 void renderCube();
+void renderDodoBird(const Shader& shader);
 void renderDino(const Shader& shader);
 void bottomDino();
 void renderFloor(); 
 void renderWall(const Shader& shader);
-//floor
+void dodoBird();
+
 void Room();
-//room
+
 void Room1();
 void Room2();
 void Room3();
 void Room4();
 void Room5();
 
-// timing
-double deltaTime = 0.0f;    // time between current frame and last frame
+double deltaTime = 0.0f;    
 double lastFrame = 0.0f;
 
 bool rotateLight = false; 
@@ -607,7 +608,7 @@ void main(int argc, char** argv)
 	glfwSetKeyCallback(window, key_callback);
 
 	// tell GLFW to capture our mouse
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	glewInit();
 
@@ -625,9 +626,10 @@ void main(int argc, char** argv)
 
 	// load textures
 	// -------------
-	unsigned int dinosaurTexture = CreateTexture(strExePath + "\\dinosaur.jpeg");
+	unsigned int dinosaurTexture = CreateTexture(strExePath + "\\dinosaur.jpg");
 	unsigned int floorTexture = CreateTexture(strExePath + "\\ColoredFloor.png");
 	unsigned int wallTexture = CreateTexture(strExePath + "\\Wall.jpg");
+	unsigned int dodoBirdtexture = CreateTexture(strExePath + "\\dinosaur.jpg");
 
 	// configure depth map FBO
 	// -----------------------
@@ -705,7 +707,6 @@ void main(int argc, char** argv)
 		shadowMappingDepthShader.Use();
 		shadowMappingDepthShader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
 
-
 		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -736,9 +737,24 @@ void main(int argc, char** argv)
 		glBindTexture(GL_TEXTURE_2D, dinosaurTexture);
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_FRONT);
+		renderDodoBird(shadowMappingDepthShader);
+		glCullFace(GL_BACK);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, dinosaurTexture);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
 		renderDino(shadowMappingDepthShader);
 		glCullFace(GL_BACK);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 
 		// reset viewport
 		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -757,6 +773,7 @@ void main(int argc, char** argv)
 		shadowMappingShader.SetVec3("lightPos", lightPos);
 		shadowMappingShader.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
 
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, floorTexture);
 		glActiveTexture(GL_TEXTURE1);
@@ -770,6 +787,14 @@ void main(int argc, char** argv)
 		glBindTexture(GL_TEXTURE_2D, depthMap);
 		glDisable(GL_CULL_FACE);
 		renderWall(shadowMappingShader);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, dinosaurTexture);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+		glDisable(GL_CULL_FACE);
+		renderDodoBird(shadowMappingShader);
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, dinosaurTexture);
 		glActiveTexture(GL_TEXTURE1);
@@ -777,11 +802,16 @@ void main(int argc, char** argv)
 		glDisable(GL_CULL_FACE);
 		renderDino(shadowMappingShader);
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+
+
+
+
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+
 	}
 
-	// optional: de-allocate all resources once they've outlived their purpose:
+
 	delete pCamera;
 
 	glfwTerminate();
@@ -1017,14 +1047,100 @@ void renderDino(const Shader& shader)
 	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
 	model = glm::scale(model, glm::vec3(0.75f));
 	shader.SetMat4("model", model);
-	renderTrexBottom();
+	upperDino();
 
 	model = glm::mat4();
 	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
 	model = glm::scale(model, glm::vec3(0.75f));
 	shader.SetMat4("model", model);
-	renderTrexTop();
+	bottomDino();
+
 }
+void renderDodoBird(const Shader& shader)
+{
+	glm::mat4 model;
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.99f, 0.0f));
+	shader.SetMat4("model", model);
+	dodoBird();
+
+
+}
+GLuint dodoVAO, dodoVBO, dodoEBO;
+void dodoBird()
+{
+	if (trexTopVAO == 0)
+	{
+
+		std::vector<float> verticess;
+		std::vector<float> indicess;
+
+
+		Loader.LoadFile("C:/Users/Alex Lung/Desktop/Clone/Museum/Debug/dodo.obj");
+		object::Mesh curMesh = Loader.LoadedMeshes[0];
+		int size = curMesh.Vertices.size();
+
+		for (int j = 0; j < curMesh.Vertices.size(); j++)
+		{
+
+			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+		}
+		for (int j = 0; j < verticess.size(); j++)
+		{
+			vertices[j] = verticess.at(j);
+		}
+
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+
+			indicess.push_back((float)curMesh.Indices[j]);
+
+		}
+		for (int j = 0; j < curMesh.Indices.size(); j++)
+		{
+			indices[j] = indicess.at(j);
+		}
+
+		glGenVertexArrays(1, &dodoVAO);
+		glGenBuffers(1, &dodoVBO);
+		glGenBuffers(1, &dodoEBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, dodoVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dodoEBO);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices, GL_DYNAMIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(dodoVAO);
+		glEnableVertexAttribArray(0);
+
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+	// render Cube
+	glBindVertexArray(dodoVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, dodoVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, dodoEBO);
+	int indexArraySize;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexArraySize);
+	glDrawElements(GL_TRIANGLES, indexArraySize / sizeof(unsigned int), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+}
+
 void upperDino()
 {
 	if (trexTopVAO == 0)
@@ -1041,13 +1157,13 @@ void upperDino()
 		for (int j = 0; j < curMesh.Vertices.size(); j++)
 		{
 
-			verticess.push_back((float)curMesh.Vertices[j].Position.X);
+			verticess.push_back((float)curMesh.Vertices[j].Position.X+10);
 			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
 			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X+10);
 			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
 			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
-			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X+10);
 			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
 		}
 		for (int j = 0; j < verticess.size(); j++)
@@ -1117,14 +1233,14 @@ void bottomDino()
 		for (int j = 0; j < curMesh.Vertices.size(); j++)
 		{
 
-			verticess.push_back((float)curMesh.Vertices[j].Position.X);
-			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
-			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
-			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
-			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.X+10);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y );
+			verticess.push_back((float)curMesh.Vertices[j].Position.Z );
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X + 10);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y );
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Z );
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X + 10);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y );
 		}
 		for (int j = 0; j < verticess.size(); j++)
 		{
@@ -1587,14 +1703,14 @@ void Room5()
 		for (int j = 0; j < curMesh.Vertices.size(); j++)
 		{
 
-			verticess.push_back((float)curMesh.Vertices[j].Position.X);
-			verticess.push_back((float)curMesh.Vertices[j].Position.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Position.X+100);
+			verticess.push_back((float)curMesh.Vertices[j].Position.Y+100);
 			verticess.push_back((float)curMesh.Vertices[j].Position.Z);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.X);
-			verticess.push_back((float)curMesh.Vertices[j].Normal.Y);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.X+100);
+			verticess.push_back((float)curMesh.Vertices[j].Normal.Y+100);
 			verticess.push_back((float)curMesh.Vertices[j].Normal.Z);
-			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X);
-			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.X+100);
+			verticess.push_back((float)curMesh.Vertices[j].TextureCoordinate.Y+100);
 		}
 		for (int j = 0; j < verticess.size(); j++)
 		{
